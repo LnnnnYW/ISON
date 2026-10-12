@@ -10,7 +10,7 @@ import gc
 from scipy.spatial import distance_matrix
         
 def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_size=1024, W10=None, W20=None, H10=None, H20=None, coords=None, device=None, dtype=torch.float32, lattice="square"):
-    
+    # maxiter: maximum iteration times; lattice: space grid type
     gc.collect()
     torch.cuda.empty_cache()
     
@@ -22,20 +22,20 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
         
     if W10 is None or W20 is None or H10 is None or H20 is None:
         generator = torch.Generator(device=device).manual_seed(600)
-        W10 = torch.rand(PeakO.shape[0], K, dtype=dtype, device=device, generator=generator)
-        W20 = torch.rand(X1.shape[0], K, dtype=dtype, device=device, generator=generator)
+        W10 = torch.rand(PeakO.shape[0], K, dtype=dtype, device=device, generator=generator)   # torch.rand(a, b): generate a tensor, a*b matrix with elements are random numbers from 0 to 1. 
+        W20 = torch.rand(X1.shape[0], K, dtype=dtype, device=device, generator=generator)      # X.shape[0]: # of rows, and shape[1] is # of cols
         H10 = torch.rand(K, PeakO.shape[1], dtype=dtype, device=device, generator=generator)
         H20 = torch.rand(K, X2.shape[1], dtype=dtype, device=device, generator=generator)    
         
     eps=1e-9
 
-	#platform effects
+	#platform effects # create Vgenes
     V1=torch.mean(X1, dim=1).unsqueeze(1)
     V2=torch.mean(X2, dim=1).unsqueeze(1)
     V=torch.cat((V1,V2), dim=1).to(device=device, dtype=dtype) #merge gene expression
 
     Vpeak=torch.mean(PeakO, dim=1).unsqueeze(1)
-    Vp=torch.cat((Vpeak, Vpeak), dim=1).to(device=device, dtype=dtype) #merge peaks
+    Vp=torch.cat((Vpeak, Vpeak), dim=1).to(device=device, dtype=dtype) #merge peaks 
 
     F1=torch.zeros((2, X1.shape[1]), device=device, dtype=dtype)
     F1[0,:] =F1[0,:] + 1
@@ -55,8 +55,8 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
    
         
     mb_size = batch_size 
-    n1 = X1.shape[1]
-    n2 = X2.shape[1]
+    n1 = X1.shape[1]  # cell number
+    n2 = X2.shape[1]  # spot number
     n_batch = min(n1, n2) // mb_size
     
     onesW10 = torch.ones(PeakO.shape[0], 1, dtype=dtype, device=device)
@@ -68,7 +68,7 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
     H1 = H10.clone()
     H2 = H20.clone()  
     
-    lm_splits = []
+    lm_splits = [] 
     peakosplits = []
     x1splits = []
     x2splits = []
@@ -76,18 +76,19 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
     mu1 = (l1 * lambda1)/ l2
     mu2 = (l1 * lambda1)/ l3
 
+# Spatial Information
     if coords is not None: #if coords are provided, use them to compute the adjacency matrix    
-        adjacency_matrix=compute_adjacency_with_limits(coords, lattice=lattice)
-        degree_values = np.array(adjacency_matrix.sum(axis=1))  # Get degree sum as 1D array
-        degree_matrix = diags(degree_values)   # Convert sum result to 1D array
-        lapm = degree_matrix - adjacency_matrix
-        lapm = np.asarray(lapm)
+        adjacency_matrix=compute_adjacency_with_limits(coords, lattice=lattice)                 # A
+        degree_values = np.array(adjacency_matrix.sum(axis=1))  # Get degree sum as 1D array    # get degree
+        degree_matrix = diags(degree_values)   # Convert sum result to 1D array                 # D
+        lapm = degree_matrix - adjacency_matrix                                                 # L = D - A
+        lapm = np.asarray(lapm)  # convert into Numpy arry, to divide into batches
 	
-	#storing data into batches
+	#storing data into batches (KFold partition)
 
-    for i, (s1, s2) in enumerate(zip(kf.split(X1.t()), kf.split(X2.t()))):
-        mb1 =s1[1]
-        mb2 =s2[1]
+    for i, (s1, s2) in enumerate(zip(kf.split(X1.t()), kf.split(X2.t()))):     # kf.split output: (train_indices, test_indices)
+        mb1 =s1[1]  # single-cell indices in this batch
+        mb2 =s2[1]  # spatial-spot indices in this batch
 
         if coords is not None:
             lm_splits.append(torch.tensor(lapm[mb2, :][:, mb2]).to(device=device, dtype=dtype))
@@ -108,18 +109,18 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
             x1i = x1splits[i].to(device=device, dtype=dtype)
             x2i = x2splits[i].to(device=device, dtype=dtype)
 
-            W10_H10_mb1 = torch.mm(W10, H10[:, mb1]) + eps
-            W20_H10_mb1 = torch.mm(W20, H10[:, mb1]) + eps
+            W10_H10_mb1 = torch.mm(W10, H10[:, mb1]) + eps  # torch.mm: 2 dimension matrix multiplication
+            W20_H10_mb1 = torch.mm(W20, H10[:, mb1]) + eps  # eps to avoid actual / reconstruction = 0
             W20_H20_mb2 = torch.mm(W20, H20[:, mb2]) + eps
 
             # Update H1
-            numer = W10.T @ (peakoi / W10_H10_mb1) + mu1 * W20.T @ (x1i / W20_H10_mb1)
+            numer = W10.T @ (peakoi / W10_H10_mb1) + mu1 * W20.T @ (x1i / W20_H10_mb1)   # .T: transpose; @: matrix multiplication operator
             denom = W10.T @ onesW10 + mu1 * W20.T @ onesW20 + eps
             H1[:, mb1] = F.relu(H10[:, mb1] * (numer / denom))
 
             # Update H2
             if coords is not None:
-                numer = mu2 * W20.T @ (x2i / W20_H20_mb2) + 2 * lambda2 * H20[:, mb2] @ lm_splits[i]
+                numer = mu2 * W20.T @ (x2i / W20_H20_mb2) + 2 * lambda2 * H20[:, mb2] @ lm_splits[i]  ## Spatial component added here with lambda2
             else:
                 numer = mu2 * W20.T @ (x2i / W20_H20_mb2) + 2 * lambda2 * H20[:, mb2]
             denom = mu2 * W20.T @ onesW20 + eps  
@@ -131,7 +132,7 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
             W1 = F.relu(W10 * (numer / denom))
 
             # Update W2
-            denom = mu1 * (onesH10[:, mb1] @ H1[:, mb1].T) + mu2 * (onesH20[:, mb2] @ H2[:, mb2].T) + eps
+            denom = mu1 * (onesH10[:, mb1] @ H1[:, mb1].T) + mu2 * (onesH20[:, mb2] @ H2[:, mb2].T) + eps 
             numer = mu1 * (x1i / (W20 @ H1[:, mb1] + eps)) @ H1[:, mb1].T + mu2 * (x2i / (W20 @ H2[:, mb2] + eps)) @ H2[:, mb2].T
             W2 = F.relu(W20 * (numer / denom))
 
@@ -146,7 +147,7 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
             x2splits[i] = x2splits[i].cpu()
             torch.cuda.empty_cache()
             
-        W20_H10 = torch.matmul(W20, H10)
+        W20_H10 = torch.matmul(W20, H10)   # torch.mutual: matrix multiplication = A @ B
         W20_H20 = torch.matmul(W20, H20)
         W10_H10 = torch.matmul(W10, H10)
         
@@ -159,17 +160,19 @@ def KL_NMF(PeakO, X1, X2, K, maxiter, iterLoss=0, lambda1=1, lambda2=1, batch_si
             
     return W1, W2, H1, H2
 
-def compute_adjacency_with_limits(coords, lattice="square"):
 
+# Tranform spatial spots (x,y) into an adjacency matrix A, to see who are neighbours
+def compute_adjacency_with_limits(coords, lattice="square"):  
     n = len(coords)
     dist_matrix = distance_matrix(coords, coords)
-    A = np.zeros((n, n), dtype=int)
+    A = np.zeros((n, n), dtype=int)      # Intialized as a n*n zero matrix
 
     nonzero_dists = dist_matrix[dist_matrix > 0]
     avg_dist = np.mean(nonzero_dists)
     radius = avg_dist * 1.5
 
-    if lattice == "square":
+# `lattice`: decides how many neighbors we could have. 
+    if lattice == "square": 
         max_neighbors_interior = 8
     elif lattice == "hex":
         max_neighbors_interior = 6
@@ -178,6 +181,7 @@ def compute_adjacency_with_limits(coords, lattice="square"):
     else:
         raise ValueError("lattice must be 'square', 'hex', or 'triangle'.")
 
+# Decide how many neighbour to keep according to candidate spots in the radius
     def classify(num_close):
         if num_close <= 3:
             # corner-like region
@@ -189,7 +193,7 @@ def compute_adjacency_with_limits(coords, lattice="square"):
             # interior region
             return max_neighbors_interior
 
-    # Build adjacency based on distance + lattice geometry
+    # Build adjacency matrix A based on distance + lattice geometry (used for L = D - A)
     for i in range(n):
         dists = dist_matrix[i]
         # sort neighbors by distance

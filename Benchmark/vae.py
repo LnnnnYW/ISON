@@ -32,16 +32,16 @@ rna, atac, sprna, spatac=preprocess.prep(rna, atac, sprna, spatac)
 
 #converting to tensors
 
-train_mu=utils.convert_to_tensor(utils.get_zscore(rna),transpose=False)
+train_mu=utils.convert_to_tensor(utils.get_zscore(rna),transpose=False)   # z-score standardization (with mean 0 var 1)
 test_mu=utils.convert_to_tensor(utils.get_zscore(atac), transpose=False)
 
 train_sp=utils.convert_to_tensor(utils.get_zscore(sprna),transpose=False)
 test_sp=utils.convert_to_tensor(utils.get_zscore(spatac), transpose=False)
 
-lat=10
+lat=10 # what this lat for? for bemodel training?
 spat_new=bemodel.forward(train_sp.to(dtype=torch.float32), lat)[1]
 mult_new=bemodel.forward(train_mu.to(dtype=torch.float32), lat)[1]
 
-zmu = F.normalize(spat_new, dim=1)
+zmu = F.normalize(spat_new, dim=1)    # L2 normalization (with magnititude 1)
 zsp = F.normalize(mult_new, dim=1)
 preddec=model2.decoder(spat_new)

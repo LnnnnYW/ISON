@@ -44,14 +44,14 @@ if __name__ == '__main__':
     coords=coords[["x", "y"]]
     
     #preprocessing
-    rna=preprocess.remove_mito(rna) 
+    rna=preprocess.remove_mito(rna)  # remove mitochondrial genes from rna data
     sprna=preprocess.remove_mito(sprna) 
    
-    trainmu, testmu, trainsp=preprocess.prep(rna, atac, sprna, raw=False, merge=True)
+    trainmu, testmu, trainsp=preprocess.prep(rna, atac, sprna, raw=False, merge=True) # do alignment according to cells and genes for the 3 dataset
 
-    train_mu=utils.convert_to_tensor(trainmu,transpose=False)
-    test_mu=utils.convert_to_tensor(testmu, transpose=False)
-    train_sp=utils.convert_to_tensor(trainsp,transpose=False)
+    train_mu=utils.convert_to_tensor(trainmu,transpose=False)  # trainmu = X      # scRNA
+    test_mu=utils.convert_to_tensor(testmu, transpose=False)   # testmu  = Y      # scATAC
+    train_sp=utils.convert_to_tensor(trainsp,transpose=False)  # trainsp = SX     # spatial RNA
     
     train_sp=train_sp.to(dev, dtype=torch.float32)
     train_mu=train_mu.to(dev, dtype=torch.float32)
@@ -71,8 +71,9 @@ if __name__ == '__main__':
     ### inputs are anndata.X
     print("Training...")
     W1,W2,H1,H2=tri_nmf.KL_NMF(test_mu.t(), train_mu.t(), train_sp.t(), K=k, batch_size=args.batch_size, maxiter=50, iterLoss=1, lambda1=lambda1, lambda2=lambda2, coords=coords,  device=dev, lattice=args.lattice)
-    print("Training complete.")
-    W1=W1[:,:k]
+    # .t() here is transpose
+    print("Training complete.")   
+    W1=W1[:,:k]        # The output of KL_NMF still keeps K+2 components, containing the platform effects. Here only keep K components, denoising
     H2=H2[:k,:]
     O2_hat=torch.mm(W1,H2)
 
@@ -84,7 +85,7 @@ if __name__ == '__main__':
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    output_filename = os.path.join(output_dir, 'weights.pt')
+    output_filename = os.path.join(output_dir, 'weights.pt')   # save learned weights (W1, W2, H1, H2)
     torch.save({'W1': W1, 'H1': H1, 'W2': W2, 'H2': H2}, output_filename)
     print(f"Weights file saved to {output_filename}")
 

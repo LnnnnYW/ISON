@@ -33,7 +33,7 @@ def prep(geneexp, peaks, spgene, merge=True, raw=False):
         
         #barcodes
 
-        idx=geneexp.obs.index.intersection(peaks.obs_names)
+        idx=geneexp.obs.index.intersection(peaks.obs_names)    # adata.obs.index -- row names -- cells here
         geneexp=geneexp[geneexp.obs.index.isin(idx)]
         Y=peaks[peaks.obs.index.isin(idx)]
 
@@ -42,11 +42,11 @@ def prep(geneexp, peaks, spgene, merge=True, raw=False):
         geneexp=geneexp[:,~geneexp.var.index.duplicated()]
         spgene=spgene[:,~spgene.var.index.duplicated()]
 
-        idx=geneexp.var.index.intersection(spgene.var_names)
+        idx=geneexp.var.index.intersection(spgene.var_names)    # adata.var.index -- column names -- genes here
         X=geneexp[:,geneexp.var.index.isin(idx)]
         SX=spgene[:,spgene.var.index.isin(idx)]
     
-        return X, Y, SX
+        return X, Y, SX   # X: scRNA; Y: scATAC; SX: ST
     
     return geneexp, peaks, spgene
     

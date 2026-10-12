@@ -1,11 +1,12 @@
 #!/bin/bash
 
-SCRNA="/your/path/rna.h5ad"
-SCATAC="/your/path/atac.h5ad"
-ST="/your/path/sprna.h5ad"
-COORDS="/your/path/coords.csv"
-OUTPUT_DIR="/your/path/output"
+SCRNA="/mnt/c/Work/Ying/P21-processed-20260930T192948Z-1-001/P21-processed/rnap21.h5ad"
+SCATAC="/mnt/c/Work/Ying/P21-processed-20260930T192948Z-1-001/P21-processed/atacp21.h5ad"
+ST="/mnt/c/Work/Ying/P21-processed-20260930T192948Z-1-001/P21-processed/sprnap21.h5ad"
+COORDS="/mnt/c/Work/Ying/P21-processed-20260930T192948Z-1-001/P21-processed/coordsp21.csv"
+OUTPUT_DIR="/home/ywan1204/data/ISON/output"
 
+SP_ATAC="/mnt/c/Work/Ying/P21-processed-20260930T192948Z-1-001/P21-processed/spatacp21.h5ad"
 
 LAMBDA1=15
 LAMBDA2=0.001
@@ -30,7 +31,6 @@ echo
 echo "PHASE 2: EVALUATION"
 echo
 
-SP_ATAC="/your/path/spatac.h5ad"
 
 python evaluation.py --st_ATAC "$SP_ATAC" \
                          -o "$OUTPUT_DIR" \
